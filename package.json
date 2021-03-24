@@ -1,0 +1,18 @@
+{
+  "name": "wong-engine",
+  "version": "1.0.0",
+  "description": "frontend engine by Serega Wong",
+  "main": "index.js",
+  "scripts": {
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SeregaWong/WongEngine.git"
+  },
+  "author": "https://github.com/SeregaWong",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SeregaWong/WongEngine/issues"
+  },
+  "homepage": "https://github.com/SeregaWong/WongEngine#readme"
+}
