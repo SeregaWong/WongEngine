@@ -4,6 +4,8 @@
   "description": "frontend engine by Serega Wong",
   "main": "index.js",
   "scripts": {
+    "clear": "if exist dist rd /q /s dist",
+    "build": "(npm run clear || 0) && tsc"
   },
   "repository": {
     "type": "git",
@@ -14,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/SeregaWong/WongEngine/issues"
   },
-  "homepage": "https://github.com/SeregaWong/WongEngine#readme"
+  "homepage": "https://github.com/SeregaWong/WongEngine#readme",
+  "devDependencies": {
+    "typescript": "^4.2.3"
+  }
 }
