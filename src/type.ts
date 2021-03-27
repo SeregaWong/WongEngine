@@ -1,6 +1,10 @@
 import {El} from './El';
 import {ElAttrs} from './ElAttrs';
 
+export interface ISchemaParser {
+    parse(s: SchemaString): SchemaData[];
+}
+
 export interface ElClass {
     new (data: ElementData): El;
     getSchema(): SchemaString;
