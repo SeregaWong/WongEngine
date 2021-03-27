@@ -1,14 +1,17 @@
+import {StringMap} from './type';
 
-class ElAttrs {
+export class ElAttrs {
 
-    constructor(options) {
-        if (typeof options === "object") {
+    public attrs: StringMap = {};
+
+    constructor(options?: StringMap) {
+        if (options) {
             for (let key in options)
                 this.setAttr(key, options[key]);
         }
     }
 
-    setAttr(key, val) {
+    public setAttr(key: string, val: string) {
 
         switch (key) {
             case 'c':
@@ -29,8 +32,7 @@ class ElAttrs {
                 key = 'innerText';
                 break;
         }
-        this[key] = val;
+
+        this.attrs[key] = val;
     }
 }
-
-module.exports = ElAttrs;

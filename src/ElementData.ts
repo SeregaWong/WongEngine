@@ -1,20 +1,12 @@
-module.exports = function (El) {
+import {El} from './El';
+import {ElAttrs} from './ElAttrs';
 
-    class ElementData {
-        name;
-        attrs;
-        inner;
-        parent;
+export class ElementData {
 
-        constructor(name, attrs, inner, parent) {
-            if (!(parent instanceof El) && parent !== undefined)
-                throw new Error('wrong parent');
-            this.name = name;
-            this.attrs = attrs;
-            this.inner = inner;
-            this.parent = parent;
-        }
-    }
-
-    return ElementData;
-};
+    constructor(
+        public name: string,
+        public attrs?: ElAttrs,
+        public inner?: string,
+        public parent?: El,
+    ) {}
+}

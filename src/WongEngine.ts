@@ -1,3 +1,8 @@
+import {El} from './El';
+import {ElAttrs} from './ElAttrs';
+import {ElementData} from './ElementData';
+import {StringMap} from './type';
+
 const nameValidReg = /[A-Za-z&_]/,
     separatorReg = /[\s\n]/,
     optionsStartReg = /[{\[]/,
@@ -6,104 +11,136 @@ const nameValidReg = /[A-Za-z&_]/,
     attrsEndReg = /}/,
     innerStartReg = /\[/,
     innerEndReg = /\]/,
-    quotesAttrReg = /.*[\s]*"[^"]*"/g,
-    elInheritors = {},
-    arrayById = {};
-let ElementData, ElAttrs, El;
+    quotesAttrReg = /.*[\s]*"[^"]*"/g;
+
+type RenderString = string;
+
+type RenderData = RenderString | El | RenderData[];
+
+enum ReadElStatus {
+    name,
+    attrs,
+    inner,
+}
+
+type ElClass = new (data: ElementData) => El;
+
+namespace WongEngine {
+    export namespace RegisterClass {
+        export interface OverloadsMap {
+            nameAndClass: [name: string, Class: ElClass];
+            classOnly: [Class: ElClass];
+        }
+        export type Overloads = OverloadsMap[keyof OverloadsMap];
+    }
+}
 
 
-class Wong {
+export class WongEngine {
 
-    static splitElsStrings(s) {
+    private static elInheritors: StringMap<ElClass> = {};
+
+    private static splitElsStrings(s: RenderString) {
         if (!s)
-            return;
+            return [];
         s = s.trim();
 
-        let elsStrings = [],
-            waeSeparator = false,
-            waeEndBracket = false,
-            elStrStartPoint = 0,
+        const elsStrings: string[] = [];
+        let wasSeparator = false,
+            wasEndBracket = false,
+            elStrStartCursor = 0,
             bracketCount = 0,
-            status = 0; // 1 - attrs, 2 - inner
+            status = ReadElStatus.name; // 1 - attrs, 2 - inner
 
         for (let i = 0; i < s.length; i++) {
-            let l = s[i];
+            let curChar = s[i];
 
             if (bracketCount) {
-                if (status === 1) {
-                    if (attrsStartReg.test(l)) {
+                if (status === ReadElStatus.attrs) {
+                    if (attrsStartReg.test(curChar)) {
                         bracketCount++;
                     }
-                    if (attrsEndReg.test(l)) {
+                    if (attrsEndReg.test(curChar)) {
                         bracketCount--;
-                        waeEndBracket = true;
+                        wasEndBracket = true;
                     }
-                } else if (status === 2) {
-                    if (innerStartReg.test(l)) {
+                } else if (status === ReadElStatus.inner) {
+                    if (innerStartReg.test(curChar)) {
                         bracketCount++;
                     }
-                    if (innerEndReg.test(l)) {
+                    if (innerEndReg.test(curChar)) {
                         bracketCount--;
-                        waeEndBracket = true;
+                        wasEndBracket = true;
                     }
                 }
             } else {
-                status = 0;
+                status = ReadElStatus.name;
 
-                if (nameValidReg.test(l) && (waeSeparator || waeEndBracket)) {
-                    elsStrings.push(s.slice(elStrStartPoint, i));
-                    elStrStartPoint = i;
+                if (nameValidReg.test(curChar) && (wasSeparator || wasEndBracket)) {
+                    elsStrings.push(s.slice(elStrStartCursor, i));
+                    elStrStartCursor = i;
                 }
-                if (optionsStartReg.test(l)) {
+                if (optionsStartReg.test(curChar)) {
                     bracketCount++;
-                    status = attrsStartReg.test(l) ? 1 : 2;
+                    status = attrsStartReg.test(curChar) ? ReadElStatus.attrs : ReadElStatus.inner;
                 }
-                if (separatorReg.test(l)) {
-                    waeSeparator = true;
-                } else
-                    waeSeparator = false;
-                waeEndBracket = false;
+                if (separatorReg.test(curChar)) {
+                    wasSeparator = true;
+                } else {
+                    wasSeparator = false;
+                }
+                wasEndBracket = false;
 
             }
         }
-        elsStrings.push(s.slice(elStrStartPoint));
+        elsStrings.push(s.slice(elStrStartCursor));
 
         return elsStrings;
     }
 
-    static parseElementData(s, parent) {
-        if (!s)
-            return;
-        let name,
-            attrs,
-            inner,
-            step = 0,
+    private static parseElementData(s: string, parent: El) {
+
+        let name: string | undefined,
+            attrs: ElAttrs | undefined,
+            inner: string | undefined,
+            step = ReadElStatus.name,
             bracketCount = 0,
-            point = 0;
+            cursor = 0;
 
         for (let i = 0; i < s.length; i++) {
-            let l = s[i];
+            const curChar = s[i];
             switch (step) {
-                case 0:
-                    if (optionsStartReg.test(l)) {
-                        name = s.slice(point, i);
-                        point = i;
-                        step = attrsStartReg.test(l) ? 1 : 2;
+                case ReadElStatus.name:
+                    if (optionsStartReg.test(curChar)) {
+                        name = s.slice(cursor, i);
+                        cursor = i;
+                        step = attrsStartReg.test(curChar) ? ReadElStatus.attrs : ReadElStatus.inner;
                         bracketCount++;
                     }
                     break;
-                case 1:
-                case 2:
-                    if ((step === 1 ? attrsStartReg : innerStartReg).test(l)) {
+                case ReadElStatus.attrs:
+                case ReadElStatus.inner:
+                    let startReg: RegExp, endReg: RegExp;
+
+                    if (step === ReadElStatus.attrs) {
+                        startReg = attrsStartReg;
+                        endReg = attrsEndReg;
+                    } else {
+                        startReg = innerStartReg;
+                        endReg = innerEndReg;
+                    }
+
+                    if (startReg.test(curChar)) {
                         bracketCount++;
-                    } else if ((step === 1 ? attrsEndReg : innerEndReg).test(l)) {
+                    } else if (endReg.test(curChar)) {
                         bracketCount--;
                         if (bracketCount === 0) {
-                            if (step === 1) {
-                                attrs = Wong.parseAttrs(s.slice(point, i + 1).trim().slice(1, -1));
-                                point = i + 1;
-                            } else
-                                inner = s.slice(point, i + 1).trim().slice(1, -1);
+                            if (step === ReadElStatus.attrs) {
+                                attrs = WongEngine.parseAttrs(s.slice(cursor, i + 1).trim().slice(1, -1));
+                                cursor = i + 1;
+                            } else {
+                                inner = s.slice(cursor, i + 1).trim().slice(1, -1);
+                            }
                             step++;
                         }
                     }
@@ -111,21 +148,24 @@ class Wong {
             }
         }
         if (!step)
-            name = s.slice(point, s.length);
-        name = name.trim();
+            name = s.slice(cursor, s.length);
 
+        name = (name || '').trim();
+
+        if (!name) throw new Error('FATAL ERROR: cannot parse name');
+ 
         return new ElementData(
             name,
             attrs,
             inner,
-            parent
+            parent,
         );
     }
 
-    static parseAttrs(s) {
+    private static parseAttrs(s: string) {
         if (!s)
             return;
-        let result = new ElAttrs();
+        const result = new ElAttrs();
 
         s = s.replace(quotesAttrReg, function (line) {
             let arr = line.trim().split(" "),
@@ -138,10 +178,10 @@ class Wong {
         s.split('\n').forEach(line => {
             line = line.trim();
             if (line) {
-                let arr = line.split(' ').filter(item => !!item);
-                if (arr.length !== 2)
+                const keyAndVal = line.split('\s').filter(item => !!item);
+                if (keyAndVal.length !== 2)
                     throw new Error('syntax attr exception: ' + line);
-                result.setAttr(...arr)
+                result.setAttr(keyAndVal[0], keyAndVal[1]);
             }
         });
 
@@ -149,65 +189,56 @@ class Wong {
         return result;
     }
 
-    static renderArr(o, parent) {
-        if (typeof o === "string") {
-            return Wong.renderFromString(o, parent);
-        } else if (Array.isArray(o)) {
-            return o.map(part => {
-                if (typeof part === "string") {
-                    return Wong.renderFromString(part, parent);
-                } else if (part instanceof El) {
-                    part.parent = parent;
-                    return part;
-                } else if (Array.isArray(part))
-                    return Wong.renderArr(part, parent);
-            }).flat();
-        }
-    }
-
-    static renderFromString(s, parent) {
+    private static renderFromString(s: RenderString, parent: El) {
         if (!s)
-            return;
-        return Wong.splitElsStrings(s).map(dataStr => {
-            let data = Wong.parseElementData(dataStr, parent);
-            return new (elInheritors[data.name] || El)(data);
+            return [];
+        return WongEngine.splitElsStrings(s).map(dataStr => {
+            const data = WongEngine.parseElementData(dataStr, parent);
+            return new (WongEngine.elInheritors[data.name] || El)(data);
         });
     }
 
-    static render(o, parent) {
-        if (!o)
-            return;
-        let result = Wong.renderArr(o, parent);
-        return result.length === 1 ? result[0] : result;
-    }
+    public static render(renderData: RenderData, parent: El): El[] {
 
-    static registerClass(ClassOrName, Class) {
-        let name;
-        if (typeof ClassOrName === "string")
-            name = ClassOrName;
-        else {
-            Class = ClassOrName;
-            name = Class.name;
+        if (typeof renderData === "string") {
+            return WongEngine.renderFromString(renderData, parent);
+        } else if (renderData instanceof El) {
+            // renderData.parent = parent; // TODO set parent
+            return [renderData];
+        } else {
+            return renderData.map(part => WongEngine.render(part, parent)).flat();
         }
-        if (elInheritors[name])
-            throw new Error('Class already exist');
-        if (Class.prototype instanceof El)
-            elInheritors[name] = Class;
     }
 
-    static getElById(id) {
-        return arrayById[id];
+    // static getElById(id) {
+    //     return arrayById[id];
+    // }
+
+    public static getElInheritor(key: string) {
+        return WongEngine.elInheritors[key];
     }
 
-    static getElInheritor(key) {
-        return elInheritors[key];
+    private static isRegisterClassOverloadClassOnly(args: WongEngine.RegisterClass.Overloads):
+        args is WongEngine.RegisterClass.OverloadsMap['classOnly'] {
+
+        return args.length === 1;
     }
+
+    public static registerClass(...args: WongEngine.RegisterClass.OverloadsMap['classOnly']): void;
+    public static registerClass(...args: WongEngine.RegisterClass.OverloadsMap['nameAndClass']): void;
+    public static registerClass(...args: WongEngine.RegisterClass.Overloads): void {
+
+        if (WongEngine.isRegisterClassOverloadClassOnly(args)) {
+            let [Class] = args;
+            return WongEngine.registerClass(Class.name, Class);
+        } else {
+            let [name, Class] = args;
+
+            if (WongEngine.elInheritors[name])
+                throw new Error('Class already exist');
+
+            WongEngine.elInheritors[name] = Class;
+        }
+    }
+
 }
-
-El = require('./El')({Wong, arrayById});
-ElementData = El.ElementData;
-ElAttrs = El.ElAttrs;
-Wong.El = El;
-
-module.exports = Wong;
-
