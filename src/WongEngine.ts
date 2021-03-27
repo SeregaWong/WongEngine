@@ -1,6 +1,6 @@
 import {El} from './El';
 import {ElAttrs} from './ElAttrs';
-import {ElClass, CreateData, SchemaString, StringMap, SchemaData} from './type';
+import {CreateData, ElClass, SchemaData, SchemaString, StringMap} from './type';
 
 const nameValidReg = /[A-Za-z&_]/,
     separatorReg = /[\s\n]/,
@@ -27,7 +27,7 @@ namespace WongEngine {
     export namespace RegisterClass {
         export interface OverloadsMap {
             nameAndClass: [name: string, Class: ElClass];
-            classOnly: [Class: ElClass];
+            classOnly: [Class: ElClass, ...another: ElClass[]];
         }
         export type Overloads = OverloadsMap[keyof OverloadsMap];
     }
@@ -37,6 +37,61 @@ namespace WongEngine {
 export class WongEngine {
 
     private static elClassDatas: StringMap<ClassData> = {};
+
+    public static registerClass(...args: WongEngine.RegisterClass.OverloadsMap['classOnly']): void;
+    public static registerClass(...args: WongEngine.RegisterClass.OverloadsMap['nameAndClass']): void;
+    public static registerClass(...args: WongEngine.RegisterClass.Overloads): void {
+
+        if (WongEngine.isRegisterClassOverloadClassOnly(args)) {
+            const [Class] = args;
+
+            return WongEngine.registerClass(Class.name, Class);
+        } else {
+            const [name, Class] = args;
+
+            if (WongEngine.elClassDatas[name])
+                throw new Error('Class already exist');
+
+            WongEngine.elClassDatas[name] = {
+                Class,
+                schema: this.parseSchemaDatas(Class.getSchema()),
+            };
+        }
+    }
+
+    public static create(createData: CreateData): El[] {
+
+        if (typeof createData === "string") {
+            return WongEngine.create(WongEngine.parseSchemaDatas(createData));
+        } else if (createData instanceof El) {
+            return [createData];
+        } else if (Array.isArray(createData)) {
+            return createData.map(part => WongEngine.create(part)).flat();
+        } else {
+            const {childs: schemaChilds, ...data} = createData;
+            const elClassData = WongEngine.elClassDatas[createData.name];
+            const childs: El[] = [];
+
+            if (elClassData) {
+                childs.push(...WongEngine.create(elClassData.schema));
+            }
+
+            if (schemaChilds) {
+                childs.push(...WongEngine.create(schemaChilds));
+            }
+
+            return [
+                new (elClassData?.Class || El)({
+                    childs,
+                    ...data,
+                }),
+            ];
+        }
+    }
+
+    public static getElClassByName(name: string) {
+        return WongEngine.elClassDatas[name].Class;
+    }
 
     private static splitElsStrings(s: SchemaString) {
         if (!s)
@@ -51,7 +106,7 @@ export class WongEngine {
             status = ReadElStatus.name; // 1 - attrs, 2 - inner
 
         for (let i = 0; i < s.length; i++) {
-            let curChar = s[i];
+            const curChar = s[i];
 
             if (bracketCount) {
                 if (status === ReadElStatus.attrs) {
@@ -155,14 +210,14 @@ export class WongEngine {
         name = (name || '').trim();
 
         if (!name) throw new Error('FATAL ERROR: cannot parse name');
- 
+
         const res: SchemaData = {
             name,
             attrs,
         };
 
         if (inner) {
-            res.childs = WongEngine.parseSchemaDatas(inner); 
+            res.childs = WongEngine.parseSchemaDatas(inner);
         }
 
         return res;
@@ -174,10 +229,11 @@ export class WongEngine {
         const result = new ElAttrs();
 
         s = s.replace(quotesAttrReg, function (line) {
-            let arr = line.trim().split(" "),
+            const arr = line.trim().split(" "),
                 key = arr[0].trim();
             arr[0] = '';
             result.setAttr(key, arr.join(" ").trim().slice(1, -1));
+
             return "";
         });
 
@@ -195,64 +251,10 @@ export class WongEngine {
         return result;
     }
 
-    public static create(createData: CreateData): El[] {
-
-        if (typeof createData === "string") {
-            return WongEngine.create(WongEngine.parseSchemaDatas(createData));
-        } else if (createData instanceof El) {
-            return [createData];
-        } else if (Array.isArray(createData)) {
-            return createData.map(part => WongEngine.create(part)).flat();
-        } else {
-            const {childs: schemaChilds, ...data} = createData;
-            const elClassData = WongEngine.elClassDatas[createData.name];
-            const childs: El[] = [];
-
-            if (elClassData) {
-                childs.push(...WongEngine.create(elClassData.schema));
-            }
-            if (schemaChilds) {
-                childs.push(...WongEngine.create(schemaChilds));
-            } 
-
-            return [
-                new (elClassData?.Class || El)({
-                    childs,
-                    ...data,
-                }),
-            ];
-        }
-    }
-
-
-    public static getElClassByName(name: string) {
-        return WongEngine.elClassDatas[name].Class;
-    }
-
     private static isRegisterClassOverloadClassOnly(args: WongEngine.RegisterClass.Overloads):
         args is WongEngine.RegisterClass.OverloadsMap['classOnly'] {
 
         return args.length === 1;
-    }
-
-    public static registerClass(...args: WongEngine.RegisterClass.OverloadsMap['classOnly']): void;
-    public static registerClass(...args: WongEngine.RegisterClass.OverloadsMap['nameAndClass']): void;
-    public static registerClass(...args: WongEngine.RegisterClass.Overloads): void {
-
-        if (WongEngine.isRegisterClassOverloadClassOnly(args)) {
-            let [Class] = args;
-            return WongEngine.registerClass(Class.name, Class);
-        } else {
-            let [name, Class] = args;
-
-            if (WongEngine.elClassDatas[name])
-                throw new Error('Class already exist');
-
-            WongEngine.elClassDatas[name] = {
-                Class,
-                schema: this.parseSchemaDatas(Class.getSchema()),
-            };
-        }
     }
 
 }

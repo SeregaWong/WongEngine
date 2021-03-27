@@ -4,6 +4,7 @@
   "description": "frontend engine by Serega Wong",
   "main": "index.js",
   "scripts": {
+    "lint": "tslint --project tslint.json",
     "clear": "if exist dist rd /q /s dist",
     "build": "(npm run clear || 0) && tsc"
   },

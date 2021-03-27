@@ -6,7 +6,7 @@ export class ElAttrs {
 
     constructor(options?: StringMap) {
         if (options) {
-            for (let key in options)
+            for (const key in options)
                 this.setAttr(key, options[key]);
         }
     }
