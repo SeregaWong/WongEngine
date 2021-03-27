@@ -1,17 +1,15 @@
 import {ElAttrs} from './ElAttrs';
-import {ElementData} from './ElementData';
-import {StringMap} from './type';
+import {ElementData, CreateData, StringMap} from './type';
 import {WongEngine} from './WongEngine';
 
 export class El {
     private _el: HTMLElement;
     private _key?: string;
     private id?: string;
-    private _parent?: El;
+    private _parents: El[] = [];
     private _childs: StringMap<El> = {};
     private _childsArr: El[] = [];
     private searchDescendantCache: StringMap<El> = {};
-    private renderFlag = false;
 
     protected getExtendElementTag() {
         return '';
@@ -25,21 +23,21 @@ export class El {
         const {
             name,
             attrs,
-            parent,
         } = data;
-        const inner = data.inner || '';
+        const childs = data.childs || [];
 
         this._el = document.createElement(this.getExtendElementTag() || name);
-        this._parent = parent;
 
         if (attrs)
             this.setAttrs(attrs.attrs);
 
-        this.render(inner);
-
-        this.onCreate();
+        this.create(childs);
 
         El._els[(El._elId++).toString()] = this;
+    }
+
+    private addParent(el: El) {
+        this._parents.push(el);
     }
 
     private setAttrs(attrs: StringMap) {
@@ -67,21 +65,14 @@ export class El {
         }
     }
 
-    private render(inner: string) {
+    private create(childs: El[]) {
 
-        let addition = this.onRender();
-        let renderData: string | string[];
-        if (typeof addition === "string")
-            renderData = [addition, inner];
-        else
-            return;
+        let addition = this.dynamicCreateChilds();
 
-        if (this.renderFlag)
-            this.removeChilds('all');
-
-        this.renderFlag = true;
-        WongEngine.render(renderData, this)
+        childs.concat(WongEngine.create(addition))
             .forEach(el => this.append(el));
+
+        this.onCreate();
     }
 
     public append(el: El): void;
@@ -99,7 +90,7 @@ export class El {
         this._el.appendChild(el._el);
     }
 
-    insertBefore(el1: El, el2: El) {
+    public insertBefore(el1: El, el2: El) {
         this.addChild(el1);
         this._el.insertBefore(el1._el, el2._el);
     }
@@ -109,7 +100,7 @@ export class El {
         if (!!_key)
             this._childs[_key] = el;
         this._childsArr.push(el);
-        el._parent = this;
+        el.addParent(this);
     }
 
     public remove() {
@@ -203,46 +194,44 @@ export class El {
         el.className = className.replace(rmClassName, '');
     }
 
-    public onRender() {
+    public dynamicCreateChilds(): CreateData {
         return '';
     }
 
     public onCreate() {
     }
 
-    // get el() {
-    //     return this._el;
-    // }
+    get el() {
+        return this._el;
+    }
 
-    // get innerText() {
-    //     return this._el.innerText;
-    // }
+    get innerText() {
+        return this._el.innerText;
+    }
 
-    // set innerText(v) {
-    //     this._el.innerText = v;
-    // }
+    set innerText(v) {
+        this._el.innerText = v;
+    }
 
-    // get key() {
-    //     return this._key;
-    // }
+    get key() {
+        return this._key;
+    }
 
-    // get parent() {
-    //     return this.#parent;
-    // }
+    get parents() {
+        return [...this._parents];
+    }
 
-    // set parent(v) {
-    //     if (v instanceof El)
-    //         this.#parent = v;
-    // }
+    get childs() {
+        return {...this._childs};
+    }
 
-    // get childs() {
-    //     return this.#childs;
-    // }
+    get childsArr() {
+        return [...this._childsArr];
+    }
 
-    // get childsArr() {
-    //     return this.#childsArr;
-    // }
+    public static getElById(id: string) {
+        return El.arrayById[id];
+    }
 
     public static readonly ElAttrs = ElAttrs;
-    public static readonly ElementData = ElementData;
 }

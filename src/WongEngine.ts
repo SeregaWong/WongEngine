@@ -1,7 +1,6 @@
 import {El} from './El';
 import {ElAttrs} from './ElAttrs';
-import {ElementData} from './ElementData';
-import {StringMap} from './type';
+import {ElClass, CreateData, SchemaString, StringMap, SchemaData} from './type';
 
 const nameValidReg = /[A-Za-z&_]/,
     separatorReg = /[\s\n]/,
@@ -13,17 +12,16 @@ const nameValidReg = /[A-Za-z&_]/,
     innerEndReg = /\]/,
     quotesAttrReg = /.*[\s]*"[^"]*"/g;
 
-type RenderString = string;
-
-type RenderData = RenderString | El | RenderData[];
-
 enum ReadElStatus {
     name,
     attrs,
     inner,
 }
 
-type ElClass = new (data: ElementData) => El;
+interface ClassData {
+    Class: ElClass;
+    schema: SchemaData[];
+}
 
 namespace WongEngine {
     export namespace RegisterClass {
@@ -38,9 +36,9 @@ namespace WongEngine {
 
 export class WongEngine {
 
-    private static elInheritors: StringMap<ElClass> = {};
+    private static elClassDatas: StringMap<ClassData> = {};
 
-    private static splitElsStrings(s: RenderString) {
+    private static splitElsStrings(s: SchemaString) {
         if (!s)
             return [];
         s = s.trim();
@@ -98,7 +96,11 @@ export class WongEngine {
         return elsStrings;
     }
 
-    private static parseElementData(s: string, parent: El) {
+    private static parseSchemaDatas(s: SchemaString): SchemaData[] {
+        return this.splitElsStrings(s).map(this.parseSchemaData);
+    }
+
+    private static parseSchemaData(s: SchemaString): SchemaData {
 
         let name: string | undefined,
             attrs: ElAttrs | undefined,
@@ -154,12 +156,16 @@ export class WongEngine {
 
         if (!name) throw new Error('FATAL ERROR: cannot parse name');
  
-        return new ElementData(
+        const res: SchemaData = {
             name,
             attrs,
-            inner,
-            parent,
-        );
+        };
+
+        if (inner) {
+            res.childs = WongEngine.parseSchemaDatas(inner); 
+        }
+
+        return res;
     }
 
     private static parseAttrs(s: string) {
@@ -189,33 +195,38 @@ export class WongEngine {
         return result;
     }
 
-    private static renderFromString(s: RenderString, parent: El) {
-        if (!s)
-            return [];
-        return WongEngine.splitElsStrings(s).map(dataStr => {
-            const data = WongEngine.parseElementData(dataStr, parent);
-            return new (WongEngine.elInheritors[data.name] || El)(data);
-        });
-    }
+    public static create(createData: CreateData): El[] {
 
-    public static render(renderData: RenderData, parent: El): El[] {
-
-        if (typeof renderData === "string") {
-            return WongEngine.renderFromString(renderData, parent);
-        } else if (renderData instanceof El) {
-            // renderData.parent = parent; // TODO set parent
-            return [renderData];
+        if (typeof createData === "string") {
+            return WongEngine.create(WongEngine.parseSchemaDatas(createData));
+        } else if (createData instanceof El) {
+            return [createData];
+        } else if (Array.isArray(createData)) {
+            return createData.map(part => WongEngine.create(part)).flat();
         } else {
-            return renderData.map(part => WongEngine.render(part, parent)).flat();
+            const {childs: schemaChilds, ...data} = createData;
+            const elClassData = WongEngine.elClassDatas[createData.name];
+            const childs: El[] = [];
+
+            if (elClassData) {
+                childs.push(...WongEngine.create(elClassData.schema));
+            }
+            if (schemaChilds) {
+                childs.push(...WongEngine.create(schemaChilds));
+            } 
+
+            return [
+                new (elClassData?.Class || El)({
+                    childs,
+                    ...data,
+                }),
+            ];
         }
     }
 
-    // static getElById(id) {
-    //     return arrayById[id];
-    // }
 
-    public static getElInheritor(key: string) {
-        return WongEngine.elInheritors[key];
+    public static getElClassByName(name: string) {
+        return WongEngine.elClassDatas[name].Class;
     }
 
     private static isRegisterClassOverloadClassOnly(args: WongEngine.RegisterClass.Overloads):
@@ -234,10 +245,13 @@ export class WongEngine {
         } else {
             let [name, Class] = args;
 
-            if (WongEngine.elInheritors[name])
+            if (WongEngine.elClassDatas[name])
                 throw new Error('Class already exist');
 
-            WongEngine.elInheritors[name] = Class;
+            WongEngine.elClassDatas[name] = {
+                Class,
+                schema: this.parseSchemaDatas(Class.getSchema()),
+            };
         }
     }
 
