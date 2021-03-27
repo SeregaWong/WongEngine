@@ -151,29 +151,18 @@ export class El {
         return keys.map(key => this.searchDescendant(key));
     }
 
+    /**
+     * @deprecated use classList
+     */
     public addClass(addition: string) {
-        const el = this._el;
-        const {className} = el;
-
-        if (className) {
-            if (className.indexOf(addition) === -1)
-                el.className += ' ' + addition;
-        } else {
-            el.className = addition;
-        }
+        this._el.classList.add(addition);
     }
 
+    /**
+     * @deprecated use classList
+     */
     public removeClass(rmClassName: string) {
-        const el = this._el;
-        const {className} = el;
-        const index = className.indexOf(rmClassName);
-
-        if (index === -1)
-            return;
-        if (index !== 0)
-            rmClassName = ' ' + rmClassName;
-
-        el.className = className.replace(rmClassName, '');
+        this._el.classList.remove(rmClassName);
     }
 
     public dynamicCreateChilds(): CreateData {
