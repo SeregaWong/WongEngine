@@ -43,9 +43,10 @@ export class WongEngine {
     public static registerClass(...args: WongEngine.RegisterClass.Overloads): void {
 
         if (WongEngine.isRegisterClassOverloadClassOnly(args)) {
-            const [Class] = args;
 
-            return WongEngine.registerClass(Class.name, Class);
+            args.forEach(Class => {
+                WongEngine.registerClass(Class.name, Class);
+            });
         } else {
             const [name, Class] = args;
 
@@ -254,7 +255,7 @@ export class WongEngine {
     private static isRegisterClassOverloadClassOnly(args: WongEngine.RegisterClass.Overloads):
         args is WongEngine.RegisterClass.OverloadsMap['classOnly'] {
 
-        return args.length === 1;
+        return typeof args[0] !== 'string';
     }
 
 }
