@@ -5,11 +5,15 @@ const {
     create,
     getElClassByName,
     registerClass,
+    schemaParsers,
+    setSchemaParser,
 } = WongEngine;
 
 export default {
     create,
     getElClassByName,
     registerClass,
+    schemaParsers,
+    setSchemaParser,
     El,
 }

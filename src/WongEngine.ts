@@ -20,7 +20,7 @@ namespace WongEngine {
 
 export class WongEngine {
 
-    private static schemaParsers: StringMap<ISchemaParser> = {
+    public static schemaParsers: StringMap<ISchemaParser> = {
         wongMarkupParser: new WongMarkupParser(),
         xmlParser: new XmlParser(),
     };
