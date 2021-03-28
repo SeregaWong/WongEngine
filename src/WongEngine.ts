@@ -1,5 +1,6 @@
 import {El} from './El';
 import {WongMarkupParser} from './parsers/WongMarkupParser';
+import {XmlParser} from './parsers/XmlParser';
 import {CreateData, ElClass, ISchemaParser, SchemaData, SchemaString, StringMap} from './type';
 
 interface ClassData {
@@ -21,6 +22,7 @@ export class WongEngine {
 
     private static schemaParsers: StringMap<ISchemaParser> = {
         wongMarkupParser: new WongMarkupParser(),
+        xmlParser: new XmlParser(),
     };
 
     private static schemaParser: ISchemaParser = WongEngine.schemaParsers.wongMarkupParser;
